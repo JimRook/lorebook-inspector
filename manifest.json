@@ -1,0 +1,12 @@
+{
+  "display_name": "Lorebook Inspector",
+  "loading_order": 10,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "",
+  "version": "1.0.0",
+  "homePage": "",
+  "auto_update": true
+}
