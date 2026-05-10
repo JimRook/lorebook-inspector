@@ -249,3 +249,10 @@ td.lb-keys {
     opacity: 1;
     color: #a9c4f5;
 }
+
+th.lb-dispidx, td.lb-dispidx {
+    width: 36px;
+    text-align: center;
+    color: #666;
+    font-size: 11px;
+}
