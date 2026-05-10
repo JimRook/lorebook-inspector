@@ -1,9 +1,5 @@
-import { getContext } from '../../../script.js';
-
-const MODULE_NAME = 'lorebook-inspector';
-
 function getLoreEntries() {
-    const ctx = getContext();
+    const ctx = SillyTavern.getContext();
     return ctx.characters?.[ctx.characterId]?.data?.character_book?.entries ?? null;
 }
 
@@ -115,6 +111,6 @@ function addToolbarButton() {
     }
 }
 
-jQuery(async () => {
+jQuery(document).ready(function () {
     addToolbarButton();
 });
