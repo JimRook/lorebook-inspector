@@ -24,7 +24,6 @@ function renderRows(entries) {
         return matchesSearch && matchesFilter;
     });
 
-    // Sort by display_index to match lorebook UI order
     const sorted = [...filtered].sort((a, b) => {
         const ai = a.extensions?.display_index ?? a.id;
         const bi = b.extensions?.display_index ?? b.id;
@@ -38,17 +37,13 @@ function renderRows(entries) {
         const keys = (e.keys || []).join(', ') || '—';
         const order = e.insertion_order ?? e.order ?? '—';
         return `
-            <tr class="lb-row ${i % 2 === 0 ? 'lb-row-even' : 'lb-row-odd'}" data-id="${e.id}">
+            <tr class="lb-row ${i % 2 === 0 ? 'lb-row-even' : 'lb-row-odd'}">
                 <td class="lb-dispidx">${displayIndex}</td>
                 <td class="lb-id" title="Click to copy ID">${e.id}</td>
                 <td class="lb-name" title="${name}">${name}</td>
                 <td class="lb-keys" title="${keys}">${keys}</td>
                 <td class="lb-state">
-                    <span class="lb-badge lb-toggle ${enabled ? 'lb-on' : 'lb-off'}"
-                          data-id="${e.id}"
-                          title="Click to toggle">
-                        ${enabled ? 'on' : 'off'}
-                    </span>
+                    <span class="lb-badge ${enabled ? 'lb-on' : 'lb-off'}">${enabled ? 'on' : 'off'}</span>
                 </td>
                 <td class="lb-order">${order}</td>
             </tr>`;
@@ -62,40 +57,12 @@ function renderRows(entries) {
             : `${filtered.length} / ${total} entries`;
     }
 
-    attachRowListeners();
-}
-
-function attachRowListeners() {
+    // Only attach copy listeners — no writes
     document.querySelectorAll('td.lb-id').forEach(cell => {
         cell.addEventListener('click', () => {
             navigator.clipboard.writeText(cell.textContent.trim()).then(() => {
                 toastr.success(`ID ${cell.textContent.trim()} copied`);
             });
-        });
-    });
-
-    document.querySelectorAll('.lb-toggle').forEach(badge => {
-        badge.addEventListener('click', () => {
-            const id = parseInt(badge.dataset.id);
-            const entries = getLoreEntries();
-            if (!entries) return;
-
-            const entry = entries.find(e => e.id === id);
-            if (!entry) return;
-
-            entry.enabled = entry.enabled === false ? true : false;
-
-            const ctx = getContext();
-            ctx.saveCharacterDebounced?.();
-
-            const enabled = entry.enabled !== false;
-            badge.textContent = enabled ? 'on' : 'off';
-            badge.className = `lb-badge lb-toggle ${enabled ? 'lb-on' : 'lb-off'}`;
-
-            toastr.success(`Entry ${id} ${enabled ? 'enabled' : 'disabled'}`);
-
-            const fresh = getLoreEntries();
-            if (fresh) renderRows(fresh);
         });
     });
 }
@@ -153,7 +120,7 @@ function showInspector() {
                 </table>
             </div>
             <div id="lb-inspector-footer">
-                <span>Click ID to copy &nbsp;·&nbsp; Click state badge to toggle &nbsp;·&nbsp; # = lorebook UI order</span>
+                <span>Click ID to copy &nbsp;·&nbsp; # = lorebook UI order &nbsp;·&nbsp; Read only</span>
             </div>
         </div>`;
 
@@ -180,8 +147,8 @@ function showInspector() {
 
     document.getElementById('lb-search').addEventListener('input', (e) => {
         currentSearch = e.target.value.toLowerCase();
-        const entries = getLoreEntries();
-        if (entries) renderRows(entries);
+        const fresh = getLoreEntries();
+        if (fresh) renderRows(fresh);
     });
 
     document.querySelectorAll('.lb-filter').forEach(btn => {
@@ -189,8 +156,8 @@ function showInspector() {
             currentFilter = btn.dataset.filter;
             document.querySelectorAll('.lb-filter').forEach(b => b.classList.remove('lb-filter-active'));
             btn.classList.add('lb-filter-active');
-            const entries = getLoreEntries();
-            if (entries) renderRows(entries);
+            const fresh = getLoreEntries();
+            if (fresh) renderRows(fresh);
         });
     });
 }
