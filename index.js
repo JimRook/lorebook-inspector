@@ -1,14 +1,8 @@
-function getLoreEntries() {
-    const ctx = SillyTavern.getContext();
-    return ctx.characters?.[ctx.characterId]?.data?.character_book?.entries ?? null;
-}
+import { getContext } from '../../../extensions.js';
 
-function saveEntries() {
-    const ctx = SillyTavern.getContext();
-    const character = ctx.characters[ctx.characterId];
-    if (character?.data?.character_book) {
-        ctx.saveCharacterDebounced?.();
-    }
+function getLoreEntries() {
+    const ctx = getContext();
+    return ctx.characters?.[ctx.characterId]?.data?.character_book?.entries ?? null;
 }
 
 let currentFilter = 'all';
@@ -30,22 +24,23 @@ function renderRows(entries) {
         return matchesSearch && matchesFilter;
     });
 
-    const sorted = [...filtered].sort((a, b) => a.id - b.id);
+    const sorted = [...filtered].sort((a, b) => (a.uid ?? a.id) - (b.uid ?? b.id));
 
     tbody.innerHTML = sorted.map((e, i) => {
         const enabled = e.enabled !== false;
+        const uid = e.uid ?? e.id;
         const name = e.comment || e.title || '(unnamed)';
         const keys = (e.keys || []).join(', ') || '—';
         const order = e.insertion_order ?? e.order ?? '—';
         const position = e.position ?? '—';
         return `
-            <tr class="lb-row ${i % 2 === 0 ? 'lb-row-even' : 'lb-row-odd'}" data-id="${e.id}">
-                <td class="lb-id" title="Click to copy ID">${e.id}</td>
+            <tr class="lb-row ${i % 2 === 0 ? 'lb-row-even' : 'lb-row-odd'}" data-uid="${uid}">
+                <td class="lb-uid" title="Click to copy UID">${uid}</td>
                 <td class="lb-name" title="${name}">${name}</td>
                 <td class="lb-keys" title="${keys}">${keys}</td>
                 <td class="lb-state">
                     <span class="lb-badge lb-toggle ${enabled ? 'lb-on' : 'lb-off'}"
-                          data-id="${e.id}"
+                          data-uid="${uid}"
                           title="Click to toggle">
                         ${enabled ? 'on' : 'off'}
                     </span>
@@ -67,34 +62,36 @@ function renderRows(entries) {
 }
 
 function attachRowListeners() {
-    document.querySelectorAll('td.lb-id').forEach(cell => {
+    document.querySelectorAll('td.lb-uid').forEach(cell => {
         cell.addEventListener('click', () => {
             navigator.clipboard.writeText(cell.textContent.trim()).then(() => {
-                toastr.success(`ID ${cell.textContent.trim()} copied`);
+                toastr.success(`UID ${cell.textContent.trim()} copied`);
             });
         });
     });
 
     document.querySelectorAll('.lb-toggle').forEach(badge => {
         badge.addEventListener('click', () => {
-            const id = parseInt(badge.dataset.id);
+            const uid = parseInt(badge.dataset.uid);
             const entries = getLoreEntries();
             if (!entries) return;
 
-            const entry = entries.find(e => e.id === id);
+            const entry = entries.find(e => (e.uid ?? e.id) === uid);
             if (!entry) return;
 
             entry.enabled = entry.enabled === false ? true : false;
-            saveEntries();
+
+            const ctx = getContext();
+            ctx.saveCharacterDebounced?.();
 
             const enabled = entry.enabled !== false;
             badge.textContent = enabled ? 'on' : 'off';
             badge.className = `lb-badge lb-toggle ${enabled ? 'lb-on' : 'lb-off'}`;
 
-            toastr.success(`Entry ${id} ${enabled ? 'enabled' : 'disabled'}`);
+            toastr.success(`UID ${uid} ${enabled ? 'enabled' : 'disabled'}`);
 
-            const entries2 = getLoreEntries();
-            if (entries2) renderRows(entries2);
+            const fresh = getLoreEntries();
+            if (fresh) renderRows(fresh);
         });
     });
 }
@@ -140,7 +137,7 @@ function showInspector() {
                 <table id="lb-inspector-table">
                     <thead>
                         <tr>
-                            <th class="lb-id">ID</th>
+                            <th class="lb-uid">UID</th>
                             <th class="lb-name">Name / Comment</th>
                             <th class="lb-keys">Keys</th>
                             <th class="lb-state">State</th>
@@ -152,7 +149,7 @@ function showInspector() {
                 </table>
             </div>
             <div id="lb-inspector-footer">
-                <span>Click ID to copy &nbsp;·&nbsp; Click state badge to toggle</span>
+                <span>Click UID to copy &nbsp;·&nbsp; Click state badge to toggle</span>
             </div>
         </div>`;
 
@@ -205,10 +202,10 @@ function addToolbarButton() {
 
     const toolbar = document.getElementById('leftSendForm') ?? document.getElementById('send_form');
     if (toolbar) {
-        toolbar.prepend(btn);
+        toolbar.appendChild(btn);
     }
 }
 
-jQuery(document).ready(function () {
+jQuery(async () => {
     addToolbarButton();
 });
