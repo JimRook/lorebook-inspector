@@ -256,3 +256,85 @@ th.lb-dispidx, td.lb-dispidx {
     color: #666;
     font-size: 11px;
 }
+
+th.lb-check, td.lb-check {
+    width: 32px;
+    text-align: center;
+    padding: 4px 6px;
+}
+
+.lb-checkbox {
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+    accent-color: #a9c4f5;
+}
+
+.lb-row {
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.lb-row.lb-selected {
+    background: #1e2d4a !important;
+    outline: 1px solid #3a5a8a;
+}
+
+#lb-clear-selection {
+    background: none;
+    border: 1px solid #3a3a5a;
+    color: #7a8faa;
+    border-radius: 5px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: monospace;
+    transition: all 0.15s;
+    margin-left: auto;
+}
+
+#lb-clear-selection:hover {
+    border-color: #bd5d5d;
+    color: #bd5d5d;
+}
+
+#lb-copy-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: #1a2a3a;
+    border-top: 1px solid #3a5a8a;
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #a9c4f5;
+    font-family: monospace;
+}
+
+#lb-copy-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#lb-copy-btn {
+    background: #2a3a5a;
+    border: 1px solid #a9c4f5;
+    color: #a9c4f5;
+    border-radius: 5px;
+    padding: 4px 14px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: monospace;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+#lb-copy-btn:hover {
+    background: #3a4a6a;
+}
