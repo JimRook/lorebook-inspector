@@ -3,6 +3,7 @@ import { getContext } from '../../../extensions.js';
 let currentFilter = 'all';
 let currentSearch = '';
 let liveInterval = null;
+let selectedIds = new Set();
 
 function getLoreEntriesFromDOM() {
     const domEntries = [];
@@ -22,11 +23,35 @@ function getLoreEntriesFromDOM() {
     return domEntries;
 }
 
-function toggleEntry(entry) {
-    const killSwitch = entry.el.querySelector('[name="entryKillSwitch"]');
-    if (killSwitch) {
-        killSwitch.click();
+function updateCopyBar() {
+    const bar = document.getElementById('lb-copy-bar');
+    const btn = document.getElementById('lb-copy-btn');
+    const label = document.getElementById('lb-copy-label');
+    if (!bar || !btn || !label) return;
+
+    if (selectedIds.size === 0) {
+        bar.style.display = 'none';
+    } else {
+        bar.style.display = 'flex';
+        label.textContent = `${selectedIds.size} selected: ${[...selectedIds].sort((a,b) => a-b).join(', ')}`;
     }
+}
+
+function toggleSelection(id) {
+    if (selectedIds.has(id)) {
+        selectedIds.delete(id);
+    } else {
+        selectedIds.add(id);
+    }
+    updateCopyBar();
+
+    // Update checkbox visual without full re-render
+    const cb = document.querySelector(`.lb-checkbox[data-id="${id}"]`);
+    if (cb) cb.checked = selectedIds.has(id);
+
+    // Update row highlight
+    const row = document.querySelector(`.lb-row[data-id="${id}"]`);
+    if (row) row.classList.toggle('lb-selected', selectedIds.has(id));
 }
 
 function renderRows(entries) {
@@ -48,17 +73,18 @@ function renderRows(entries) {
 
     tbody.innerHTML = sorted.map((e, i) => {
         const keyDisplay = e.keys || '—';
+        const checked = selectedIds.has(e.id) ? 'checked' : '';
+        const selectedClass = selectedIds.has(e.id) ? 'lb-selected' : '';
         return `
-            <tr class="lb-row ${i % 2 === 0 ? 'lb-row-even' : 'lb-row-odd'}">
+            <tr class="lb-row ${i % 2 === 0 ? 'lb-row-even' : 'lb-row-odd'} ${selectedClass}" data-id="${e.id}">
+                <td class="lb-check">
+                    <input type="checkbox" class="lb-checkbox" data-id="${e.id}" ${checked}/>
+                </td>
                 <td class="lb-id" title="Click to copy ID" data-id="${e.id}">${e.id}</td>
                 <td class="lb-name" title="${e.name}">${e.name}</td>
                 <td class="lb-keys" title="${keyDisplay}">${keyDisplay}</td>
                 <td class="lb-state">
-                    <span class="lb-badge lb-toggle ${e.enabled ? 'lb-on' : 'lb-off'}"
-                          data-id="${e.id}"
-                          title="Click to toggle">
-                        ${e.enabled ? 'on' : 'off'}
-                    </span>
+                    <span class="lb-badge ${e.enabled ? 'lb-on' : 'lb-off'}">${e.enabled ? 'on' : 'off'}</span>
                 </td>
                 <td class="lb-order">${e.order}</td>
             </tr>`;
@@ -71,7 +97,7 @@ function renderRows(entries) {
             : `${filtered.length} / ${entries.length} entries`;
     }
 
-    // Copy ID on click
+    // Copy single ID on cell click
     document.querySelectorAll('td.lb-id').forEach(cell => {
         cell.addEventListener('click', () => {
             navigator.clipboard.writeText(cell.textContent.trim()).then(() => {
@@ -80,36 +106,41 @@ function renderRows(entries) {
         });
     });
 
-    // Toggle via DOM — same mechanism as the MC
-    document.querySelectorAll('.lb-toggle').forEach(badge => {
-        badge.addEventListener('click', () => {
-            const id = parseInt(badge.dataset.id);
-            const all = getLoreEntriesFromDOM();
-            const entry = all.find(e => e.id === id);
-            if (!entry) return;
-            toggleEntry(entry);
-            toastr.success(`Entry ${id} ${entry.enabled ? 'disabled' : 'enabled'}`);
+    // Checkbox selection
+    document.querySelectorAll('.lb-checkbox').forEach(cb => {
+        cb.addEventListener('change', () => {
+            toggleSelection(parseInt(cb.dataset.id));
+        });
+    });
+
+    // Row click to toggle selection (excluding checkbox and id cell)
+    document.querySelectorAll('.lb-row').forEach(row => {
+        row.addEventListener('click', e => {
+            if (e.target.classList.contains('lb-checkbox') || 
+                e.target.classList.contains('lb-id') ||
+                e.target.closest('td.lb-id') ||
+                e.target.closest('td.lb-check')) return;
+            toggleSelection(parseInt(row.dataset.id));
         });
     });
 }
 
-function showInspector() {
-    const existing = document.getElementById('lb-inspector-overlay');
-    if (existing) {
-        existing.remove();
-        document.getElementById('lb-inspector-btn')?.classList.remove('active');
-        if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
-        currentFilter = 'all';
-        currentSearch = '';
+function closeInspector() {
+    const overlay = document.getElementById('lb-inspector-overlay');
+    if (overlay) overlay.remove();
+    document.getElementById('lb-inspector-btn')?.classList.remove('active');
+    if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
+    currentFilter = 'all';
+    currentSearch = '';
+}
+
+async function showInspector() {
+    if (document.getElementById('lb-inspector-overlay')) {
+        closeInspector();
         return;
     }
 
     const entries = getLoreEntriesFromDOM();
-
-    if (entries.length === 0) {
-        toastr.warning('No lorebook entries found. Is the lorebook editor open?');
-        return;
-    }
 
     const overlay = document.createElement('div');
     overlay.id = 'lb-inspector-overlay';
@@ -129,12 +160,14 @@ function showInspector() {
                     <button class="lb-filter ${currentFilter === 'all' ? 'lb-filter-active' : ''}" data-filter="all">All</button>
                     <button class="lb-filter ${currentFilter === 'on'  ? 'lb-filter-active' : ''}" data-filter="on">On</button>
                     <button class="lb-filter ${currentFilter === 'off' ? 'lb-filter-active' : ''}" data-filter="off">Off</button>
+                    <button id="lb-clear-selection" title="Clear selection">✕ clear</button>
                 </div>
             </div>
             <div id="lb-inspector-body">
                 <table id="lb-inspector-table">
                     <thead>
                         <tr>
+                            <th class="lb-check"></th>
                             <th class="lb-id">ID</th>
                             <th class="lb-name">Name / Comment</th>
                             <th class="lb-keys">Keys</th>
@@ -145,8 +178,12 @@ function showInspector() {
                     <tbody></tbody>
                 </table>
             </div>
+            <div id="lb-copy-bar" style="display:none">
+                <span id="lb-copy-label"></span>
+                <button id="lb-copy-btn"><i class="fa-solid fa-copy"></i> Copy IDs</button>
+            </div>
             <div id="lb-inspector-footer">
-                <span>Click ID to copy &nbsp;·&nbsp; Click state to toggle &nbsp;·&nbsp; Live</span>
+                <span>Click ID to copy single &nbsp;·&nbsp; Tick rows to multi-select &nbsp;·&nbsp; Live</span>
             </div>
         </div>`;
 
@@ -154,26 +191,12 @@ function showInspector() {
     document.getElementById('lb-inspector-btn')?.classList.add('active');
 
     renderRows(entries);
+    updateCopyBar();
 
-    document.getElementById('lb-inspector-close').addEventListener('click', () => {
-        overlay.remove();
-        document.getElementById('lb-inspector-btn')?.classList.remove('active');
-        if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
-        currentFilter = 'all';
-        currentSearch = '';
-    });
+    document.getElementById('lb-inspector-close').addEventListener('click', closeInspector);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeInspector(); });
 
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-            overlay.remove();
-            document.getElementById('lb-inspector-btn')?.classList.remove('active');
-            if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
-            currentFilter = 'all';
-            currentSearch = '';
-        }
-    });
-
-    document.getElementById('lb-search').addEventListener('input', (e) => {
+    document.getElementById('lb-search').addEventListener('input', e => {
         currentSearch = e.target.value.toLowerCase();
         renderRows(getLoreEntriesFromDOM());
     });
@@ -187,7 +210,19 @@ function showInspector() {
         });
     });
 
-    // Live polling — re-render every second from DOM
+    document.getElementById('lb-clear-selection').addEventListener('click', () => {
+        selectedIds.clear();
+        renderRows(getLoreEntriesFromDOM());
+        updateCopyBar();
+    });
+
+    document.getElementById('lb-copy-btn').addEventListener('click', () => {
+        const sorted = [...selectedIds].sort((a, b) => a - b).join(', ');
+        navigator.clipboard.writeText(sorted).then(() => {
+            toastr.success(`Copied: ${sorted}`);
+        });
+    });
+
     liveInterval = setInterval(() => {
         if (!document.getElementById('lb-inspector-overlay')) {
             clearInterval(liveInterval);
@@ -195,22 +230,19 @@ function showInspector() {
             return;
         }
         renderRows(getLoreEntriesFromDOM());
+        updateCopyBar();
     }, 1000);
 }
 
 function addToolbarButton() {
     if (document.getElementById('lb-inspector-btn')) return;
-
     const btn = document.createElement('div');
     btn.id = 'lb-inspector-btn';
     btn.title = 'Lorebook Inspector';
     btn.classList.add('fa-solid', 'fa-book-open', 'interactable');
     btn.addEventListener('click', showInspector);
-
     const toolbar = document.getElementById('leftSendForm') ?? document.getElementById('send_form');
-    if (toolbar) {
-        toolbar.appendChild(btn);
-    }
+    if (toolbar) toolbar.appendChild(btn);
 }
 
 jQuery(async () => {
