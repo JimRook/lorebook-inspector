@@ -25,10 +25,8 @@ function getLoreEntriesFromDOM() {
 
 function updateCopyBar() {
     const bar = document.getElementById('lb-copy-bar');
-    const btn = document.getElementById('lb-copy-btn');
     const label = document.getElementById('lb-copy-label');
-    if (!bar || !btn || !label) return;
-
+    if (!bar || !label) return;
     if (selectedIds.size === 0) {
         bar.style.display = 'none';
     } else {
@@ -44,12 +42,8 @@ function toggleSelection(id) {
         selectedIds.add(id);
     }
     updateCopyBar();
-
-    // Update checkbox visual without full re-render
     const cb = document.querySelector(`.lb-checkbox[data-id="${id}"]`);
     if (cb) cb.checked = selectedIds.has(id);
-
-    // Update row highlight
     const row = document.querySelector(`.lb-row[data-id="${id}"]`);
     if (row) row.classList.toggle('lb-selected', selectedIds.has(id));
 }
@@ -84,7 +78,7 @@ function renderRows(entries) {
                 <td class="lb-name" title="${e.name}">${e.name}</td>
                 <td class="lb-keys" title="${keyDisplay}">${keyDisplay}</td>
                 <td class="lb-state">
-                    <span class="lb-badge ${e.enabled ? 'lb-on' : 'lb-off'}">${e.enabled ? 'on' : 'off'}</span>
+                    <span class="lb-badge lb-toggle ${e.enabled ? 'lb-on' : 'lb-off'}" data-id="${e.id}" title="Click to toggle">${e.enabled ? 'on' : 'off'}</span>
                 </td>
                 <td class="lb-order">${e.order}</td>
             </tr>`;
@@ -97,7 +91,6 @@ function renderRows(entries) {
             : `${filtered.length} / ${entries.length} entries`;
     }
 
-    // Copy single ID on cell click
     document.querySelectorAll('td.lb-id').forEach(cell => {
         cell.addEventListener('click', () => {
             navigator.clipboard.writeText(cell.textContent.trim()).then(() => {
@@ -106,20 +99,34 @@ function renderRows(entries) {
         });
     });
 
-    // Checkbox selection
     document.querySelectorAll('.lb-checkbox').forEach(cb => {
         cb.addEventListener('change', () => {
             toggleSelection(parseInt(cb.dataset.id));
         });
     });
 
-    // Row click to toggle selection (excluding checkbox and id cell)
+    document.querySelectorAll('.lb-toggle').forEach(badge => {
+        badge.addEventListener('click', e => {
+            e.stopPropagation();
+            const id = parseInt(badge.dataset.id);
+            const all = getLoreEntriesFromDOM();
+            const entry = all.find(en => en.id === id);
+            if (!entry) return;
+            const killSwitch = entry.el.querySelector('[name="entryKillSwitch"]');
+            if (killSwitch) {
+                killSwitch.click();
+                toastr.success(`Entry ${id} ${entry.enabled ? 'disabled' : 'enabled'}`);
+            }
+        });
+    });
+
     document.querySelectorAll('.lb-row').forEach(row => {
         row.addEventListener('click', e => {
-            if (e.target.classList.contains('lb-checkbox') || 
+            if (e.target.classList.contains('lb-checkbox') ||
                 e.target.classList.contains('lb-id') ||
                 e.target.closest('td.lb-id') ||
-                e.target.closest('td.lb-check')) return;
+                e.target.closest('td.lb-check') ||
+                e.target.closest('td.lb-state')) return;
             toggleSelection(parseInt(row.dataset.id));
         });
     });
@@ -134,13 +141,18 @@ function closeInspector() {
     currentSearch = '';
 }
 
-async function showInspector() {
+function showInspector() {
     if (document.getElementById('lb-inspector-overlay')) {
         closeInspector();
         return;
     }
 
     const entries = getLoreEntriesFromDOM();
+
+    if (entries.length === 0) {
+        toastr.warning('No lorebook entries found. Is the lorebook editor open with a lorebook selected?');
+        return;
+    }
 
     const overlay = document.createElement('div');
     overlay.id = 'lb-inspector-overlay';
